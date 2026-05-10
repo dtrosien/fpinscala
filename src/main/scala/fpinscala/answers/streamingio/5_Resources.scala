@@ -186,7 +186,7 @@ object Resources:
       )
 
     def toList[F2[x] >: F[x]: MonadThrow, O2 >: O]: F2[List[O2]] =
-      fold(List.newBuilder[O])((bldr, o) => bldr += o).map(_(1).result)
+      fold(List.newBuilder[O])((bldr, o) => bldr += o).map(_(1).result())
 
     def flatMap[F2[x] >: F[x], O2 >: O, R2](f: R => Pull[F2, O2, R2]): Pull[F2, O2, R2] =
       FlatMap(this, f)
@@ -339,7 +339,7 @@ object Resources:
         case Some((o, r)) => Pull.Output(o) ++ unfoldEval(r)(f)
 
     def fromIterator[O](itr: Iterator[O]): Stream[Nothing1, O] =
-      if itr.hasNext then Pull.Output(itr.next) >> fromIterator(itr) else Pull.done
+      if itr.hasNext then Pull.Output(itr.next()) >> fromIterator(itr) else Pull.done
 
     def raiseError[F[_], O](t: Throwable): Stream[F, O] = Pull.Error(t)
 
@@ -413,7 +413,7 @@ object ResourcesExample:
 
   def lines(path: String): Stream[Task, String] =
     file(path).flatMap(source =>
-      Stream.eval(Task(source.getLines)).flatMap(Stream.fromIterator)
+      Stream.eval(Task(source.getLines())).flatMap(Stream.fromIterator)
     )
 
   val printLines: Stream[Task, Unit] = 

@@ -1,6 +1,6 @@
 package fpinscala.answers.iomonad
 
-object BindTest extends App:
+@main def bindTest(): Unit =
 
   def timeit(n: Int)(task: => Unit): Unit =
     val start = System.currentTimeMillis
@@ -13,11 +13,10 @@ object BindTest extends App:
     f((0 to N).map(i => unit.map(_ => i)).foldLeft(F.unit(0)): (f1, f2) =>
       for
         acc <- f1
-        i <- f2
+        i   <- f2
       yield
         // if (i == N) println("result: " + (acc+i))
-        (acc + i)
-    )
+        (acc + i))
 
   import fpinscala.answers.parallelism.Nonblocking.*
 

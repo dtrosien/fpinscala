@@ -1,5 +1,7 @@
 package fpinscala.exercises.laziness
 
+import scala.util.{Random, Try}
+
 import fpinscala.answers.testing.exhaustive.*
 import fpinscala.answers.testing.exhaustive.Gen.`**`
 import fpinscala.answers.testing.exhaustive.Prop.*
@@ -7,8 +9,6 @@ import fpinscala.exercises.common.Common.*
 import fpinscala.exercises.common.PropSuite
 import fpinscala.exercises.laziness.LazyList
 import fpinscala.exercises.laziness.LazyList.*
-
-import scala.util.{Random, Try}
 
 class LazyListSuite extends PropSuite:
   private val genSmallInt = Gen.choose(0, 10)
@@ -26,11 +26,11 @@ class LazyListSuite extends PropSuite:
     loop()
 
   test("LazyList.headOption")(genLazyList):
-    case Empty      => assert(Empty.headOption.isEmpty)
+    case Empty => assert(Empty.headOption.isEmpty)
     case Cons(h, t) => assert(Cons(h, t).headOption.contains(h()))
 
   test("LazyList.cons")(
-    genLazyList.map(tail => (LazyList.cons(Random.nextInt, tail), Cons(Random.nextInt, () => tail)))
+    genLazyList.map(tail => (LazyList.cons(Random.nextInt(), tail), Cons(Random.nextInt, () => tail)))
   ): (smartConstructor, oldConstructor) =>
     assertEquals(smartConstructor.headOption, smartConstructor.headOption)
     assertNotEquals(oldConstructor.headOption, oldConstructor.headOption)

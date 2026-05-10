@@ -27,7 +27,7 @@ object SimplePulls:
         case Right((hd, tl)) => tl.fold(f(init, hd))(f)
 
     def toList: List[O] =
-      fold(List.newBuilder[O])((bldr, o) => bldr += o)(1).result
+      fold(List.newBuilder[O])((bldr, o) => bldr += o)(1).result()
 
     def flatMap[O2 >: O, R2](f: R => Pull[O2, R2]): Pull[O2, R2] =
       FlatMap(this, f)
@@ -241,7 +241,7 @@ object SimplePullExamples:
     p: Pipe[String, A],
   )(using m: Monoid[A]): IO[A] = IO:
     val source = scala.io.Source.fromFile(file)
-    try fromIterator(source.getLines).pipe(p).fold(m.empty)(m.combine)
+    try fromIterator(source.getLines()).pipe(p).fold(m.empty)(m.combine)
     finally source.close()
 
   def checkFileForGt40K(file: java.io.File): IO[Boolean] =

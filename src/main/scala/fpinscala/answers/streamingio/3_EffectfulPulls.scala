@@ -41,7 +41,7 @@ object EffectfulPulls:
         case Right((hd, tl)) => tl.fold(f(init, hd))(f)
 
     def toList[F2[x] >: F[x]: Monad, O2 >: O]: F2[List[O2]] =
-      fold(List.newBuilder[O])((bldr, o) => bldr += o).map(_(1).result)
+      fold(List.newBuilder[O])((bldr, o) => bldr += o).map(_(1).result())
 
     def flatMap[F2[x] >: F[x], O2 >: O, R2](f: R => Pull[F2, O2, R2]): Pull[F2, O2, R2] =
       FlatMap(this, f)

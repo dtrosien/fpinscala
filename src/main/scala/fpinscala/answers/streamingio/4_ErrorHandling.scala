@@ -56,7 +56,7 @@ object ErrorHandling:
         case Right((hd, tl)) => tl.fold(f(init, hd))(f)
 
     def toList[F2[x] >: F[x]: MonadThrow, O2 >: O]: F2[List[O2]] =
-      fold(List.newBuilder[O])((bldr, o) => bldr += o).map(_(1).result)
+      fold(List.newBuilder[O])((bldr, o) => bldr += o).map(_(1).result())
 
     def flatMap[F2[x] >: F[x], O2 >: O, R2](f: R => Pull[F2, O2, R2]): Pull[F2, O2, R2] =
       FlatMap(this, f)
@@ -210,7 +210,7 @@ object ErrorHandling:
         case Some((o, r)) => Pull.Output(o) ++ unfoldEval(r)(f)
 
     def fromIterator[O](itr: Iterator[O]): Stream[Nothing1, O] =
-      if itr.hasNext then Pull.Output(itr.next) >> fromIterator(itr) else Pull.done
+      if itr.hasNext then Pull.Output(itr.next()) >> fromIterator(itr) else Pull.done
 
     def raiseError[F[_], O](t: Throwable): Stream[F, O] = Pull.Error(t)
 
@@ -276,7 +276,7 @@ object ErrorHandlingExample:
     Task(Source.fromFile(path))
 
   def use(source: Source): Stream[Task, Unit] =
-    Stream.eval(Task(source.getLines))
+    Stream.eval(Task(source.getLines()))
       .flatMap(itr => Stream.fromIterator(itr))
       .mapEval(line => Task(println(line)))
 
