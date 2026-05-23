@@ -1,6 +1,5 @@
 package fpinscala.exercises.state
 
-
 trait RNG:
   def nextInt: (Int, RNG) // Should generate a random `Int`. We'll later define other functions in terms of `nextInt`.
 
@@ -9,9 +8,11 @@ object RNG:
 
   case class Simple(seed: Long) extends RNG:
     def nextInt: (Int, RNG) =
-      val newSeed = (seed * 0x5DEECE66DL + 0xBL) & 0xFFFFFFFFFFFFL // `&` is bitwise AND. We use the current seed to generate a new seed.
+      val newSeed =
+        (seed * 0x5deece66dL + 0xbL) & 0xffffffffffffL // `&` is bitwise AND. We use the current seed to generate a new seed.
       val nextRNG = Simple(newSeed) // The next state, which is an `RNG` instance created from the new seed.
-      val n = (newSeed >>> 16).toInt // `>>>` is right binary shift with zero fill. The value `n` is our new pseudo-random integer.
+      val n =
+        (newSeed >>> 16).toInt // `>>>` is right binary shift with zero fill. The value `n` is our new pseudo-random integer.
       (n, nextRNG) // The return value is a tuple containing both a pseudo-random integer and the next `RNG` state.
 
   type Rand[+A] = RNG => (A, RNG)
@@ -26,27 +27,74 @@ object RNG:
       val (a, rng2) = s(rng)
       (f(a), rng2)
 
-  def nonNegativeInt(rng: RNG): (Int, RNG) = ???
+  def nonNegativeInt(rng: RNG): (Int, RNG) =
+    val (i, r) = rng.nextInt
+    (if i < 0 then -(i + 1) else i, r)
 
-  def double(rng: RNG): (Double, RNG) = ???
+  def double(rng: RNG): (Double, RNG) =
+    val (i, r) = nonNegativeInt(rng)
+    (i / (Int.MaxValue.toDouble + 1), r)
 
-  def intDouble(rng: RNG): ((Int,Double), RNG) = ???
+  def intDouble(rng: RNG): ((Int, Double), RNG) =
+    val (i, r1) = rng.nextInt
+    val (d, r2) = double(r1)
+    ((i, d), r2)
 
-  def doubleInt(rng: RNG): ((Double,Int), RNG) = ???
+  def doubleInt(rng: RNG): ((Double, Int), RNG) =
+    val ((i, d), r) = intDouble(rng)
+    ((d, i), r)
 
-  def double3(rng: RNG): ((Double,Double,Double), RNG) = ???
+  def double3(rng: RNG): ((Double, Double, Double), RNG) =
+    val (d1, r1) = double(rng)
+    val (d2, r2) = double(r1)
+    val (d3, r3) = double(r2)
+    ((d1, d2, d3), r3)
 
-  def ints(count: Int)(rng: RNG): (List[Int], RNG) = ???
+  def ints(count: Int)(rng: RNG): (List[Int], RNG) =
+    def go(count: Int)(rng: RNG)(agg: List[Int]): (List[Int], RNG) =
+      if count > 0 then
+        val (i, r) = rng.nextInt
+        go(count - 1)(r)(i :: agg)
+      else (agg, rng)
+    go(count)(rng)(List.empty)
 
-  def map2[A, B, C](ra: Rand[A], rb: Rand[B])(f: (A, B) => C): Rand[C] = ???
+  def doubleRand: Rand[Double] =
+    map(nonNegativeInt)(i => (i / (Int.MaxValue.toDouble + 1)))
 
-  def sequence[A](rs: List[Rand[A]]): Rand[List[A]] = ???
+  def map2[A, B, C](ra: Rand[A], rb: Rand[B])(f: (A, B) => C): Rand[C] =
+    rng0 =>
+      val (a, rng1) = ra(rng0)
+      val (b, rng2) = rb(rng1)
+      (f(a, b), rng2)
 
-  def flatMap[A, B](r: Rand[A])(f: A => Rand[B]): Rand[B] = ???
+  def sequenceRawAndBad[A](rs: List[Rand[A]]): Rand[List[A]] =
+    rng0 =>
+      rs.foldRight((rng0: RNG) => (Nil: List[A], rng0))((r, rs) =>
+        rng =>
+          val (a, r1) = r(rng)
+          val (as, r2) = rs(r1) // can be removed with map2
+          (a :: as, r2)
+      )(rng0)
 
-  def mapViaFlatMap[A, B](r: Rand[A])(f: A => B): Rand[B] = ???
+  def sequence[A](rs: List[Rand[A]]): Rand[List[A]] =
+    rs.foldRight(unit(Nil: List[A]))((r, acc) => map2(r, acc)(_ :: _))
 
-  def map2ViaFlatMap[A, B, C](ra: Rand[A], rb: Rand[B])(f: (A, B) => C): Rand[C] = ???
+  def flatMap[A, B](r: Rand[A])(f: A => Rand[B]): Rand[B] =
+    rng0 =>
+      val (a, rng1) = r(rng0)
+      f(a)(rng1)
+
+  def nonNegativeLessThan(n: Int): Rand[Int] =
+    flatMap(nonNegativeInt)(i =>
+      val mod = i % n
+      if i + (n - 1) - mod >= 0 then unit(mod) else nonNegativeLessThan(n)
+    )
+
+  def mapViaFlatMap[A, B](r: Rand[A])(f: A => B): Rand[B] =
+    flatMap(r)(a => unit(f(a)))
+
+  def map2ViaFlatMap[A, B, C](ra: Rand[A], rb: Rand[B])(f: (A, B) => C): Rand[C] =
+    flatMap(ra)(a => flatMap(rb)(b => unit(f(a, b))))
 
 opaque type State[S, +A] = S => (A, S)
 
@@ -55,15 +103,26 @@ object State:
     def run(s: S): (A, S) = underlying(s)
 
     def map[B](f: A => B): State[S, B] =
-      ???
+      underlying.flatMap(a => unit(f(a)))
 
     def map2[B, C](sb: State[S, B])(f: (A, B) => C): State[S, C] =
-      ???
+      for
+        a <- underlying
+        b <- sb
+      yield f(a, b)
 
     def flatMap[B](f: A => State[S, B]): State[S, B] =
-      ???
+      s =>
+        val (a, s1) = underlying(s)
+        f(a)(s1)
 
   def apply[S, A](f: S => (A, S)): State[S, A] = f
+
+  def unit[S, A](a: A): State[S, A] =
+    s => (a, s)
+
+  def sequence[S, A](ss: List[State[S, A]]): State[S, List[A]] =
+    ss.foldRight(unit(Nil: List[A]))((a, agg) => a.map2(agg)(_ :: _))
 
 enum Input:
   case Coin, Turn
