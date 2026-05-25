@@ -21,16 +21,14 @@ object Nonblocking:
     def fork[A](a: => Par[A]): Par[A] =
       es => cb => eval(es)(a(es)(cb))
 
-    /**
-     * Helper function for constructing `Par` values out of calls to non-blocking continuation-passing-style APIs.
-     * This will come in handy in Chapter 13.
+    /** Helper function for constructing `Par` values out of calls to non-blocking continuation-passing-style APIs.
+     *  This will come in handy in Chapter 13.
      */
-    def async[A](f: (A => Unit) => Unit): Par[A] = 
+    def async[A](f: (A => Unit) => Unit): Par[A] =
       es => cb => f(cb)
 
-    /**
-     * Helper function, for evaluating an action
-     * asynchronously, using the given `ExecutorService`.
+    /** Helper function, for evaluating an action
+     *  asynchronously, using the given `ExecutorService`.
      */
     def eval(es: ExecutorService)(r: => Unit): Unit =
       es.submit(new Callable[Unit] { def call = r })
@@ -44,21 +42,22 @@ object Nonblocking:
         ref.get // Once we've passed the latch, we know `ref` has been set, and return its value
 
       def map2[B, C](p2: Par[B])(f: (A, B) => C): Par[C] =
-        es => cb =>
-          var ar: Option[A] = None
-          var br: Option[B] = None
-          // this implementation is a little too liberal in forking of threads -
-          // it forks a new logical thread for the actor and for stack-safety,
-          // forks evaluation of the callback `cb`
-          val combiner = Actor[Either[A,B]](es):
-            case Left(a) =>
-              if br.isDefined then eval(es)(cb(f(a, br.get)))
-              else ar = Some(a)
-            case Right(b) =>
-              if ar.isDefined then eval(es)(cb(f(ar.get, b)))
-              else br = Some(b)
-          p(es)(a => combiner ! Left(a))
-          p2(es)(b => combiner ! Right(b))
+        es =>
+          cb =>
+            var ar: Option[A] = None
+            var br: Option[B] = None
+            // this implementation is a little too liberal in forking of threads -
+            // it forks a new logical thread for the actor and for stack-safety,
+            // forks evaluation of the callback `cb`
+            val combiner = Actor[Either[A, B]](es):
+              case Left(a) =>
+                if br.isDefined then eval(es)(cb(f(a, br.get)))
+                else ar = Some(a)
+              case Right(b) =>
+                if ar.isDefined then eval(es)(cb(f(ar.get, b)))
+                else br = Some(b)
+            p(es)(a => combiner ! Left(a))
+            p2(es)(b => combiner ! Right(b))
 
       def map[B](f: A => B): Par[B] =
         es => cb => p(es)(a => eval(es)(cb(f(a))))
@@ -66,7 +65,7 @@ object Nonblocking:
       def flatMap[B](f: A => Par[B]): Par[B] =
         es => cb => p(es)(a => f(a)(es)(cb))
 
-      def zip[B](b: Par[B]): Par[(A,B)] = map2(b)((_,_))
+      def zip[B](b: Par[B]): Par[(A, B)] = map2(b)((_, _))
 
     def lazyUnit[A](a: => A): Par[A] =
       fork(unit(a))
@@ -112,35 +111,48 @@ object Nonblocking:
      * about `t(es)`? What about `t(es)(cb)`?
      */
     def choice[A](p: Par[Boolean])(t: Par[A], f: Par[A]): Par[A] =
-      es => cb => p(es): b =>
-        if b then eval(es)(t(es)(cb))
-        else eval(es)(f(es)(cb))
+      es =>
+        cb =>
+          p(es): b =>
+            if b then eval(es)(t(es)(cb))
+            else eval(es)(f(es)(cb))
 
     /* The code here is very similar. */
     def choiceN[A](p: Par[Int])(ps: List[Par[A]]): Par[A] =
-      ???
+      es =>
+        cb =>
+          p(es)(n => ps(n % ps.length)(es)(cb))
 
     def choiceViaChoiceN[A](a: Par[Boolean])(ifTrue: Par[A], ifFalse: Par[A]): Par[A] =
-      ???
+      es =>
+        cb =>
+          a(es)(b =>
+            if b then choiceN(unit(0))(List(ifTrue))(es)(cb)
+            else choiceN(unit(0))(List(ifFalse))(es)(cb)
+          )
 
     def choiceMap[K, V](p: Par[K])(ps: Map[K, Par[V]]): Par[V] =
-      ???
+      es => cb => p(es)(k => ps(k)(es)(cb))
 
     /* `chooser` is usually called `flatMap` or `bind`. */
     def chooser[A, B](p: Par[A])(f: A => Par[B]): Par[B] =
-      ???
+      es =>
+        cb =>
+          p(es)(a =>
+            eval(es)(f(a)(es)(cb))
+          ) // kann wie oben mit oder ohne eval gemacht werden ... eval wird dann nur async asugefuehrt
 
     def choiceViaFlatMap[A](p: Par[Boolean])(f: Par[A], t: Par[A]): Par[A] =
-      ???
+      p.flatMap(b => if b then t else f)
 
     def choiceNViaFlatMap[A](p: Par[Int])(choices: List[Par[A]]): Par[A] =
-      ???
+      p.flatMap(i => choices(i % choices.length))
 
     def join[A](p: Par[Par[A]]): Par[A] =
-      ???
+      es => cb => p(es)(a => a(es)(cb))
 
     def joinViaFlatMap[A](a: Par[Par[A]]): Par[A] =
-      ???
+      a.flatMap(a => a)
 
-    def flatMapViaJoin[A,B](p: Par[A])(f: A => Par[B]): Par[B] =
-      ???
+    def flatMapViaJoin[A, B](p: Par[A])(f: A => Par[B]): Par[B] =
+      join(p.map(f))
