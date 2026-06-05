@@ -50,6 +50,10 @@ object RNG:
     val (d3, r3) = double(r2)
     ((d1, d2, d3), r3)
 
+  def boolean(rng: RNG): (Boolean, RNG) =
+    rng.nextInt match
+      case (i, rng2) => (i % 2 == 0, rng2)
+
   def ints(count: Int)(rng: RNG): (List[Int], RNG) =
     def go(count: Int)(rng: RNG)(agg: List[Int]): (List[Int], RNG) =
       if count > 0 then
