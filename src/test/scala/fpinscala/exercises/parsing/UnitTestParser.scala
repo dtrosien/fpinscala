@@ -1,12 +1,12 @@
 package fpinscala.exercises.parsing
 
-import fpinscala.exercises.parsing.Parsers
-
 import scala.util.matching.Regex
+
+import fpinscala.exercises.parsing.Parsers
 
 /** This is similar to `fpinscala.answers.parsing.Reference` but using `fpinscala.exercises.parsing.Parsers`.
  *
- * @see
+ *  @see
  *   [[fpinscala.answers.parsing.Reference]]
  */
 object UnitTestParser extends Parsers[UnitTestParser.Parser]:
@@ -22,30 +22,30 @@ object UnitTestParser extends Parsers[UnitTestParser.Parser]:
 
     def uncommit: Result[A] = this match
       case Failure(e, true) => Failure(e, false)
-      case _                => this
+      case _ => this
 
     def addCommit(isCommitted: Boolean): Result[A] = this match
       case Failure(e, c) => Failure(e, c || isCommitted)
-      case _             => this
+      case _ => this
 
     def mapError(f: ParseError => ParseError): Result[A] = this match
       case Failure(e, c) => Failure(f(e), c)
-      case _             => this
+      case _ => this
 
     def advanceSuccess(n: Int): Result[A] = this match
       case Success(a, m) => Success(a, n + m)
-      case _             => this
+      case _ => this
 
   import Result.{Failure, Success}
 
-  def succeed[A](a: A): Parser[A] =
+  override def succeed[A](a: A): Parser[A] =
     _ => Success(a, 0)
 
   def fail(msg: String): Parser[Nothing] =
     l => Failure(l.toError(msg), true)
 
   /** Returns -1 if s1.startsWith(s2), otherwise returns the first index where the two strings differed. If s2 is longer
-   * than s1, returns s1.length.
+   *  than s1, returns s1.length.
    */
   def firstNonmatchingIndex(s1: String, s2: String, offset: Int): Int =
     var i = 0
@@ -64,7 +64,7 @@ object UnitTestParser extends Parsers[UnitTestParser.Parser]:
   def regex(r: Regex): Parser[String] =
     l =>
       r.findPrefixOf(l.remaining) match
-        case None    => Failure(l.toError(s"regex $r"), false)
+        case None => Failure(l.toError(s"regex $r"), false)
         case Some(m) => Success(m, m.length)
 
   extension [A](p: Parser[A])
@@ -76,7 +76,7 @@ object UnitTestParser extends Parsers[UnitTestParser.Parser]:
       l =>
         p(l) match
           case Failure(e, false) => p2(l)
-          case r                 => r
+          case r => r
 
     def attempt: Parser[A] = l => p(l).uncommit
 
@@ -92,7 +92,7 @@ object UnitTestParser extends Parsers[UnitTestParser.Parser]:
     def slice: Parser[String] =
       l =>
         p(l) match
-          case Success(a, n)     => Success(l.slice(n), n)
+          case Success(a, n) => Success(l.slice(n), n)
           case f @ Failure(_, _) => f
 
     def scope(msg: String): Parser[A] =
