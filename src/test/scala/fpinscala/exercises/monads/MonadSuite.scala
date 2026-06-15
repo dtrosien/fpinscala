@@ -1,5 +1,9 @@
 package fpinscala.exercises.monads
 
+import java.util.concurrent.*
+
+import scala.collection.immutable.Iterable
+
 import fpinscala.answers.testing.exhaustive.Gen.{`**`, int as genInt}
 import fpinscala.answers.testing.exhaustive.Prop.*
 import fpinscala.exercises.common.Common.*
@@ -8,13 +12,10 @@ import fpinscala.exercises.monads.MonadSuite.*
 import fpinscala.exercises.parallelism.Par
 import fpinscala.exercises.parallelism.Par.Par
 import fpinscala.exercises.parsing.UnitTestParser
-import fpinscala.exercises.parsing.UnitTestParser.{Parser, succeed}
+import fpinscala.exercises.parsing.UnitTestParser.{succeed, Parser}
 import fpinscala.exercises.state.RNG
 import fpinscala.exercises.testing.Gen
 import munit.Assertions
-
-import java.util.concurrent.*
-import scala.collection.immutable.Iterable
 
 class MonadSuite extends PropSuite:
   test("genMonad")(genInt ** genString ** genRNG):
@@ -55,8 +56,6 @@ class MonadSuite extends PropSuite:
       val listMonad = monad.traverse(intList)(Gen.unit)
       assertFs(listMonad, pure(intList))
 
-  // ToDo: Uncomment after fpinscala.exercises.testing.GenSuite passing
-/*
   test("Monad.replicateM")(genShortNumber ** genString ** genRNG):
     case n ** s ** rng =>
       val tm = genMonad(rng)
@@ -66,7 +65,6 @@ class MonadSuite extends PropSuite:
       val intList: List[Int] = listMonad.next(rng)._1
       assertEquals(intList.length, n)
       assert(intList.forall(i => 0 <= i && i <= 1000))
-*/
 
   test("Monad.filterM")(genIntList ** genRNG):
     case intList ** rng =>
@@ -221,10 +219,8 @@ object MonadSuite extends Assertions:
     new TestedMonad[Gen]:
       val monad: Monad[Gen] = Monad.genMonad
       def pure[A]: A => Gen[A] = Gen.unit
-      override def assertFs[A](actual: Gen[A], expected: Gen[A]): Unit = ???
-        // ToDo: Uncomment after fpinscala.exercises.testing.GenSuite passing
-        // Assertions.assertEquals(actual.next(rng)._1, expected.next(rng)._1)
-
+      override def assertFs[A](actual: Gen[A], expected: Gen[A]): Unit =
+        Assertions.assertEquals(actual.next(rng)._1, expected.next(rng)._1)
 
   private val parMonad: TestedMonad[Par[_]] =
     new TestedMonad[Par]:
