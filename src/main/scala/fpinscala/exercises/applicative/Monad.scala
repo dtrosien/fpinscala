@@ -12,7 +12,7 @@ trait Monad[F[_]] extends Applicative[F]:
     override def map[B](f: A => B): F[B] =
       fa.flatMap(a => unit(f(a)))
 
-    override def map2[B,C](fb: F[B])(f: (A, B) => C): F[C] =
+    override def map2[B, C](fb: F[B])(f: (A, B) => C): F[C] =
       fa.flatMap(a => fb.map(b => f(a, b)))
 
   override def apply[A, B](ff: F[A => B])(fa: F[A]): F[B] =
@@ -26,7 +26,7 @@ trait Monad[F[_]] extends Applicative[F]:
 
 object Monad:
   def composeM[G[_], H[_]](using G: Monad[G], H: Monad[H], T: Traverse[H]): Monad[[x] =>> G[H[x]]] = new:
-    def unit[A](a: => A): G[H[A]] = ???
+    def unit[A](a: => A): G[H[A]] = G.unit(H.unit(a))
     extension [A](gha: G[H[A]])
       override def flatMap[B](f: A => G[H[B]]): G[H[B]] =
-        ???
+        G.flatMap(gha)(ha => G.map(T.traverse(ha)(f))(H.join))
