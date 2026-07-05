@@ -6,7 +6,8 @@ import fpinscala.answers.monads.*
 
 object Mutable:
   def quicksort(xs: List[Int]): List[Int] =
-    if xs.isEmpty then xs else
+    if xs.isEmpty then xs
+    else
       val arr = xs.toArray
       def swap(x: Int, y: Int) =
         val tmp = arr(x)
@@ -56,14 +57,13 @@ object ST:
     su(())(0)
 
 final class STRef[S, A] private (private var cell: A):
-  def read: ST[S,A] = ST(cell)
-  def write(a: => A): ST[S, Unit] = ST.lift[S, Unit]:
-    s =>
-      cell = a
-      ((), s)
+  def read: ST[S, A] = ST(cell)
+  def write(a: => A): ST[S, Unit] = ST.lift[S, Unit]: s =>
+    cell = a
+    ((), s)
 
 object STRef:
-  def apply[S, A](a: A): ST[S, STRef[S,A]] =
+  def apply[S, A](a: A): ST[S, STRef[S, A]] =
     ST(new STRef[S, A](a))
 
 final class STArray[S, A] private (private var value: Array[A]):
@@ -71,10 +71,9 @@ final class STArray[S, A] private (private var value: Array[A]):
   def size: ST[S, Int] = ST(value.size)
 
   // Write a value at the give index of the array
-  def write(i: Int, a: A): ST[S, Unit] = ST.lift[S, Unit]:
-    s =>
-      value(i) = a
-      ((), s)
+  def write(i: Int, a: A): ST[S, Unit] = ST.lift[S, Unit]: s =>
+    value(i) = a
+    ((), s)
 
   // Read the value at the given index of the array
   def read(i: Int): ST[S, A] = ST(value(i))
@@ -84,7 +83,8 @@ final class STArray[S, A] private (private var value: Array[A]):
 
   // Exercise 14.1
   def fill(xs: Map[Int, A]): ST[S, Unit] =
-    ???
+    xs.foldRight(ST[S, Unit](())):
+      case ((k, v), st) => st.flatMap(_ => write(k, v))
 
   def swap(i: Int, j: Int): ST[S, Unit] =
     for
@@ -103,20 +103,49 @@ object STArray:
     ST(new STArray[S, A](xs.toArray))
 
 object Immutable:
+
   // Exercise 14.2
   def partition[S](a: STArray[S, Int], l: Int, r: Int, pivot: Int): ST[S, Int] =
-    ???
+    for
+      vp <- a.read(pivot)
+      _  <- a.swap(pivot, r)
+      j  <- STRef(l)
+      _  <- (l until r).foldLeft(ST[S, Unit](()))((s, i) =>
+        for
+          _  <- s
+          vi <- a.read(i)
+          _  <- if vi < vp then
+            for
+              vj <- j.read
+              _  <- a.swap(i, vj)
+              _  <- j.write(vj + 1)
+            yield ()
+          else ST[S, Unit](())
+        yield ()
+      )
+      x <- j.read
+      _ <- a.swap(x, r)
+    yield x
 
   // Exercise 14.2
-  def qs[S](a: STArray[S,Int], l: Int, r: Int): ST[S, Unit] =
-    ???
+  def qs[S](a: STArray[S, Int], l: Int, r: Int): ST[S, Unit] =
+    if l < r then
+      for
+        pi <- partition(a, l, r, l + (r - l) / 2)
+        _  <- qs(a, l, pi - 1)
+        _  <- qs(a, pi + 1, r)
+      yield ()
+    else ST[S, Unit](())
 
   def quicksort(xs: List[Int]): List[Int] =
-    if xs.isEmpty then xs else ST.run([s] => () =>
-      for
-        arr    <- STArray.fromList[s, Int](xs)
-        size   <- arr.size
-        _      <- qs(arr, 0, size - 1)
-        sorted <- arr.freeze
-      yield sorted
-   )
+    if xs.isEmpty then xs
+    else
+      ST.run([s] =>
+        () =>
+          for
+            arr    <- STArray.fromList[s, Int](xs)
+            size   <- arr.size
+            _      <- qs(arr, 0, size - 1)
+            sorted <- arr.freeze
+          yield sorted
+      )
